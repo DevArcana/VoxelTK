@@ -13,13 +13,20 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
 })
 {
     private readonly float[] _vertices = {
-        -0.5f, -0.5f, 0.0f, //Bottom-left vertex
-        0.5f, -0.5f, 0.0f, //Bottom-right vertex
-        0.0f,  0.5f, 0.0f  //Top vertex
+        0.5f,  0.5f, 0.0f,  // top right
+        0.5f, -0.5f, 0.0f,  // bottom right
+        -0.5f, -0.5f, 0.0f,  // bottom left
+        -0.5f,  0.5f, 0.0f   // top left
+    };
+    
+    private readonly uint[] _indices = {  // note that we start from 0!
+        0, 1, 3,   // first triangle
+        1, 2, 3    // second triangle
     };
     
     private int _vertexBufferObject;
     private int _vertexArrayObject;
+    private int _elementBufferObject;
     
     private Shader _shader = null!;
     
@@ -40,6 +47,10 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
         // Instead of 0 I can get the location GL.GetAttribLocation(Handle, attribName);
         GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
         GL.EnableVertexAttribArray(0); // NOTE: Bound to the currently bound VBO.
+        
+        _elementBufferObject = GL.GenBuffer();
+        GL.BindBuffer(BufferTarget.ElementArrayBuffer, _elementBufferObject);
+        GL.BufferData(BufferTarget.ElementArrayBuffer, _indices.Length * sizeof(uint), _indices, BufferUsageHint.StaticDraw);
     }
 
     protected override void OnUnload()
@@ -73,7 +84,7 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
         GL.Clear(ClearBufferMask.ColorBufferBit);
         _shader.Use();
         GL.BindVertexArray(_vertexArrayObject);
-        GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
+        GL.DrawElements(PrimitiveType.Triangles, _indices.Length, DrawElementsType.UnsignedInt, 0);
         
         SwapBuffers();
     }
