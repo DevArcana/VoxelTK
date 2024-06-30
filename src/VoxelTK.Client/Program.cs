@@ -5,6 +5,8 @@ try
     Console.WriteLine("Initializing game...");
     using var game = new Game();
     Console.WriteLine("Game is now running.");
+    game.CenterWindow();
+    game.IsVisible = true;
     game.Run();
     Console.WriteLine("Game has exited.");
 }

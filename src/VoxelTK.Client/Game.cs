@@ -9,7 +9,8 @@ namespace VoxelTK.Client;
 public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSettings
 {
     Title = "VoxelTK",
-    ClientSize = (800, 600)
+    ClientSize = (800, 600),
+    StartVisible = false
 })
 {
     private readonly float[] _vertices = {
