@@ -1,10 +1,13 @@
 ﻿using OpenTK.Graphics.OpenGL;
+using OpenTK.Mathematics;
 
 namespace VoxelTK.Client.Shaders;
 
 public class Shader : IDisposable
 {
-    private readonly int _handle;
+    public int Handle { get; }
+    
+    private readonly Dictionary<string, int> _uniformLocations = new();
 
     public Shader(string vertexPath, string fragmentPath)
     {
@@ -29,26 +32,44 @@ public class Shader : IDisposable
             throw new Exception($"Failed to compile fragment shader! Info log: {GL.GetShaderInfoLog(fragmentShader)}");
         }
         
-        _handle = GL.CreateProgram();
-        GL.AttachShader(_handle, vertexShader);
-        GL.AttachShader(_handle, fragmentShader);
+        Handle = GL.CreateProgram();
+        GL.AttachShader(Handle, vertexShader);
+        GL.AttachShader(Handle, fragmentShader);
         
-        GL.LinkProgram(_handle);
-        GL.GetProgram(_handle, GetProgramParameterName.LinkStatus, out var linkStatus);
+        GL.LinkProgram(Handle);
+        GL.GetProgram(Handle, GetProgramParameterName.LinkStatus, out var linkStatus);
         if (linkStatus == 0)
         {
-            throw new Exception($"Failed to link shader program! Info log: {GL.GetProgramInfoLog(_handle)}");
+            throw new Exception($"Failed to link shader program! Info log: {GL.GetProgramInfoLog(Handle)}");
         }
         
-        GL.DetachShader(_handle, vertexShader);
-        GL.DetachShader(_handle, fragmentShader);
+        GL.DetachShader(Handle, vertexShader);
+        GL.DetachShader(Handle, fragmentShader);
         GL.DeleteShader(vertexShader);
         GL.DeleteShader(fragmentShader);
+        
+        GL.GetProgram(Handle, GetProgramParameterName.ActiveUniforms, out var uniformCount);
+        for (var i = 0; i < uniformCount; i++)
+        {
+            var name = GL.GetActiveUniform(Handle, i, out _, out _);
+            var location = GL.GetUniformLocation(Handle, name);
+            _uniformLocations[name] = location;
+        }
     }
     
     public void Use()
     {
-        GL.UseProgram(_handle);
+        GL.UseProgram(Handle);
+    }
+    
+    public void SetMatrix4(string name, Matrix4 matrix)
+    {
+        GL.UniformMatrix4(_uniformLocations[name], true, ref matrix);
+    }
+    
+    public void SetVector3(string name, Vector3 vector)
+    {
+        GL.Uniform3(_uniformLocations[name], vector);
     }
 
     private bool _disposed;
@@ -59,7 +80,7 @@ public class Shader : IDisposable
             return;
         }
         
-        GL.DeleteProgram(_handle);
+        GL.DeleteProgram(Handle);
         _disposed = true;
         
         GC.SuppressFinalize(this);
