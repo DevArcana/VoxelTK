@@ -1,12 +1,13 @@
-﻿using OpenTK.Graphics.OpenGL;
+﻿using System.Diagnostics;
+using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 
 namespace VoxelTK.Client;
 
 public sealed class Chunk : IDisposable
 {
-    private const int Size = 16;
-    private readonly int[] _blocks = new int[16 * 16 * 16];
+    private const int Size = 128;
+    private readonly int[] _blocks = new int[Size * Size * Size];
     
     private readonly int _vertexBufferObject;
     private readonly int _vertexArrayObject;
@@ -20,8 +21,15 @@ public sealed class Chunk : IDisposable
         GL.BindVertexArray(_vertexArrayObject);
         _elementBufferObject = GL.GenBuffer();
         
+        var stopwatch = new Stopwatch();
+        
+        stopwatch.Start();
         Generate();
+        Console.WriteLine($"Generated chunk in {stopwatch.ElapsedMilliseconds}ms.");
+        
+        stopwatch.Restart();
         RebuildMesh();
+        Console.WriteLine($"Mesh rebuilt in {stopwatch.ElapsedMilliseconds}ms.");
     }
 
     private void Generate()
@@ -30,14 +38,14 @@ public sealed class Chunk : IDisposable
         var random = new Random();
         for (var i = 0; i < _blocks.Length; i++)
         {
-            _blocks[i] = 1;
+            _blocks[i] = random.Next(0, 2);
         }
     }
 
     private void RebuildMesh()
     {
-        var vertices = new List<float>();
-        var indices = new List<uint>();
+        var vertices = new List<float>(Size * Size * Size * 6 * 4 * 3);
+        var indices = new List<uint>(Size * Size * Size * 6 * 6);
         
         // build cubes for each block non zero
         for (var x = 0; x < Size; x++)
@@ -56,11 +64,10 @@ public sealed class Chunk : IDisposable
                     var fy = (float)y;
                     var fz = (float)z;
                     
-                    Console.WriteLine("block at {0}, {1}, {2}", x, y, z);
                     // top face
                     var indicesCount = (uint) vertices.Count / 3;
                     vertices.AddRange([fx, fy, fz, fx + 1, fy, fz, fx + 1, fy, fz + 1, fx, fy, fz + 1]);
-                    indices.AddRange([indicesCount, indicesCount + 1, indicesCount + 2, indicesCount + 2, indicesCount + 3, indicesCount]);
+                    indices.AddRange([indicesCount + 2, indicesCount + 1, indicesCount, indicesCount, indicesCount + 3, indicesCount + 2]);
                     
                     // bottom face
                     indicesCount = (uint) vertices.Count / 3;
@@ -80,8 +87,8 @@ public sealed class Chunk : IDisposable
                     // left face
                     indicesCount = (uint) vertices.Count / 3;
                     vertices.AddRange([fx, fy, fz, fx, fy, fz + 1, fx, fy - 1, fz + 1, fx, fy - 1, fz]);
-                    indices.AddRange([indicesCount, indicesCount + 1, indicesCount + 2, indicesCount + 2, indicesCount + 3, indicesCount]);
-                    
+                    indices.AddRange([indicesCount + 2, indicesCount + 1, indicesCount, indicesCount, indicesCount + 3, indicesCount + 2]);
+
                     // right face
                     indicesCount = (uint) vertices.Count / 3;
                     vertices.AddRange([fx + 1, fy, fz, fx + 1, fy, fz + 1, fx + 1, fy - 1, fz + 1, fx + 1, fy - 1, fz]);
@@ -105,6 +112,9 @@ public sealed class Chunk : IDisposable
     
     public void Render()
     {
+        GL.Enable(EnableCap.CullFace);
+        GL.CullFace(CullFaceMode.Back);
+        GL.FrontFace(FrontFaceDirection.Ccw);
         GL.BindVertexArray(_vertexArrayObject);
         GL.DrawElements(PrimitiveType.Triangles, _indices, DrawElementsType.UnsignedInt, 0);
     }

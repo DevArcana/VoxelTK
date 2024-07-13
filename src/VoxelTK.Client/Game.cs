@@ -1,4 +1,5 @@
-﻿using OpenTK.Graphics.OpenGL;
+﻿using ImGuiNET;
+using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
@@ -17,6 +18,7 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
     private Shader _shader = null!;
     private Chunk _chunk = null!;
     private Camera _camera = null!;
+    private ImGuiController _imgui = null!;
 
     protected override void OnLoad()
     {
@@ -28,6 +30,7 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
         _chunk = new Chunk();
         _camera = new Camera();
         _camera.UpdateViewport(Size.X, Size.Y);
+        _imgui = new ImGuiController(ClientSize.X, ClientSize.Y);
         
         // Lock mouse
         CursorState = CursorState.Grabbed;
@@ -45,6 +48,7 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
 
         GL.Viewport(0, 0, e.Width, e.Height);
         _camera.UpdateViewport(e.Width, e.Height);
+        _imgui.WindowResized(ClientSize.X, ClientSize.Y);
     }
 
     protected override void OnUpdateFrame(FrameEventArgs e)
@@ -56,49 +60,68 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
             Close();
         }
 
-        var dt = (float)e.Time;
-        var speed = 5.0f;
-
-        if (KeyboardState.IsKeyDown(Keys.LeftShift))
+        if (KeyboardState.IsKeyPressed(Keys.Tab))
         {
-            speed *= 2.0f;
+            CursorState = CursorState == CursorState.Grabbed ? CursorState.Normal : CursorState.Grabbed;
+
+            if (CursorState == CursorState.Grabbed)
+            {
+                ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.NoMouse;
+            }
+            else
+            {
+                ImGui.GetIO().ConfigFlags &= ~ImGuiConfigFlags.NoMouse;
+            }
         }
         
-        if (KeyboardState.IsKeyDown(Keys.Space))
+        if (CursorState == CursorState.Grabbed)
         {
-            _camera.Move(_camera.Up * dt * speed);
-        }
-        else if (KeyboardState.IsKeyDown(Keys.LeftControl))
-        {
-            _camera.Move(-_camera.Up * dt * speed);
-        }
+            var dt = (float)e.Time;
+            var speed = 5.0f;
 
-        if (KeyboardState.IsKeyDown(Keys.W))
-        {
-            _camera.Move(_camera.Forward * dt * speed);
-        }
-        else if (KeyboardState.IsKeyDown(Keys.S))
-        {
-            _camera.Move(-_camera.Forward * dt * speed);
-        }
+            if (KeyboardState.IsKeyDown(Keys.LeftShift))
+            {
+                speed *= 2.0f;
+            }
         
-        if (KeyboardState.IsKeyDown(Keys.A))
-        {
-            _camera.Move(-_camera.Right * dt * speed);
-        }
-        else if (KeyboardState.IsKeyDown(Keys.D))
-        {
-            _camera.Move(_camera.Right * dt * speed);
-        }
+            if (KeyboardState.IsKeyDown(Keys.Space))
+            {
+                _camera.Move(_camera.Up * dt * speed);
+            }
+            else if (KeyboardState.IsKeyDown(Keys.LeftControl))
+            {
+                _camera.Move(-_camera.Up * dt * speed);
+            }
 
-        var md = MouseState.Delta;
-        _camera.Pitch -= md.Y * 0.1f;
-        _camera.Yaw += md.X * 0.1f;
+            if (KeyboardState.IsKeyDown(Keys.W))
+            {
+                _camera.Move(_camera.Forward * dt * speed);
+            }
+            else if (KeyboardState.IsKeyDown(Keys.S))
+            {
+                _camera.Move(-_camera.Forward * dt * speed);
+            }
+        
+            if (KeyboardState.IsKeyDown(Keys.A))
+            {
+                _camera.Move(-_camera.Right * dt * speed);
+            }
+            else if (KeyboardState.IsKeyDown(Keys.D))
+            {
+                _camera.Move(_camera.Right * dt * speed);
+            }
+
+            var md = MouseState.Delta;
+            _camera.Pitch -= md.Y * 0.1f;
+            _camera.Yaw += md.X * 0.1f;
+        }
     }
-
+    
     protected override void OnRenderFrame(FrameEventArgs e)
     {
         base.OnRenderFrame(e);
+
+        _imgui.Update(this, (float) e.Time);
 
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
@@ -107,6 +130,14 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
         
         _chunk.Render();
 
+        ImGui.Begin("Budget");
+        ImGui.Text($"FPS: {1.0f / e.Time:0}");
+        ImGui.Text($"Frame time (ms): {1000.0f * e.Time:F}");
+        ImGui.End();
+        
+        _imgui.Render();
+        ImGuiController.CheckGLError("End of frame");
+        
         SwapBuffers();
     }
 }
