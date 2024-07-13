@@ -15,7 +15,7 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
 })
 {
     private Shader _shader = null!;
-    private Model _model = null!;
+    private Chunk _chunk = null!;
     private Camera _camera = null!;
 
     protected override void OnLoad()
@@ -25,7 +25,7 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
         GL.ClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
         _shader = new Shader("Shaders/shader.vert", "Shaders/shader.frag");
-        _model = new Model();
+        _chunk = new Chunk();
         _camera = new Camera();
         _camera.UpdateViewport(Size.X, Size.Y);
         
@@ -57,23 +57,38 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
         }
 
         var dt = (float)e.Time;
+        var speed = 5.0f;
+
+        if (KeyboardState.IsKeyDown(Keys.LeftShift))
+        {
+            speed *= 2.0f;
+        }
+        
+        if (KeyboardState.IsKeyDown(Keys.Space))
+        {
+            _camera.Move(_camera.Up * dt * speed);
+        }
+        else if (KeyboardState.IsKeyDown(Keys.LeftControl))
+        {
+            _camera.Move(-_camera.Up * dt * speed);
+        }
 
         if (KeyboardState.IsKeyDown(Keys.W))
         {
-            _camera.Move(_camera.Forward * dt);
+            _camera.Move(_camera.Forward * dt * speed);
         }
         else if (KeyboardState.IsKeyDown(Keys.S))
         {
-            _camera.Move(-_camera.Forward * dt);
+            _camera.Move(-_camera.Forward * dt * speed);
         }
         
         if (KeyboardState.IsKeyDown(Keys.A))
         {
-            _camera.Move(-_camera.Right * dt);
+            _camera.Move(-_camera.Right * dt * speed);
         }
         else if (KeyboardState.IsKeyDown(Keys.D))
         {
-            _camera.Move(_camera.Right * dt);
+            _camera.Move(_camera.Right * dt * speed);
         }
 
         var md = MouseState.Delta;
@@ -90,7 +105,7 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
         _shader.Use();
         _camera.SetUniforms(_shader);
         
-        _model.Render();
+        _chunk.Render();
 
         SwapBuffers();
     }
