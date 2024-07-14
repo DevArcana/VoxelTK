@@ -6,14 +6,18 @@ namespace VoxelTK.Client;
 
 public sealed class Chunk : IDisposable
 {
-    private const int Size = 128;
-    private readonly int[] _blocks = new int[Size * Size * Size];
+    private const int Size = 16;
+    private readonly byte[] _blocks = new byte[Size * Size * Size];
     
     private readonly int _vertexBufferObject;
     private readonly int _vertexArrayObject;
     private readonly int _elementBufferObject;
-    private int _indices;
     
+    private readonly float[] _vertices = new float[Size * Size * Size * 6 * 4 * 3];
+    private readonly uint[] _indices = new uint[Size * Size * Size * 6 * 6];
+    private uint _vi;
+    private uint _ii;
+
     public Chunk()
     {
         _vertexBufferObject = GL.GenBuffer();
@@ -38,16 +42,66 @@ public sealed class Chunk : IDisposable
         var random = new Random();
         for (var i = 0; i < _blocks.Length; i++)
         {
-            _blocks[i] = random.Next(0, 2);
+            _blocks[i] = (byte) random.Next(0, 2);
+        }
+        
+        for (var i = 0; i < _blocks.Length; i++)
+        {
+            if (_blocks[i] == 0)
+            {
+                continue;
+            }
+            
+            var x = i % Size;
+            var y = (i / Size) % Size;
+            var z = i / (Size * Size);
+            
+            var top = x + (y + 1) * Size + z * Size * Size;
+            var bottom = x + (y - 1) * Size + z * Size * Size;
+            var back = x + y * Size + (z + 1) * Size * Size;
+            var front = x + y * Size + (z - 1) * Size * Size;
+            var left = (x - 1) + y * Size + z * Size * Size;
+            var right = (x + 1) + y * Size + z * Size * Size;
+
+            if (y == Size - 1 || (_blocks[top] & 1) == 0)
+            {
+                _blocks[i] |= 1 << 1;
+            } 
+            
+            if (y == 0 || (_blocks[bottom] & 1) == 0)
+            {
+                _blocks[i] |= 1 << 2;
+            }
+            
+            if (z == Size - 1 || (_blocks[back] & 1) == 0)
+            {
+                _blocks[i] |= 1 << 3;
+            }
+            
+            if (z == 0 || (_blocks[front] & 1) == 0)
+            {
+                _blocks[i] |= 1 << 4;
+            }
+
+            if (x == 0 || (_blocks[left] & 1) == 0)
+            {
+                _blocks[i] |= 1 << 5;
+            }
+            
+            if (x == Size - 1 || (_blocks[right] & 1) == 0)
+            {
+                _blocks[i] |= 1 << 6;
+            }
         }
     }
 
     private void RebuildMesh()
     {
-        var vertices = new List<float>(Size * Size * Size * 6 * 4 * 3);
-        var indices = new List<uint>(Size * Size * Size * 6 * 6);
-        
+        _vi = 0;
+        _ii = 0;
         // build cubes for each block non zero
+        var cubes = 0;
+        var skipped = 0;
         for (var x = 0; x < Size; x++)
         {
             for (var y = 0; y < Size; y++)
@@ -55,68 +109,183 @@ public sealed class Chunk : IDisposable
                 for (var z = 0; z < Size; z++)
                 {
                     var block = _blocks[x + y * Size + z * Size * Size];
-                    if (block == 0)
+                    if (block >> 1 == 0)
                     {
+                        skipped++;
                         continue;
                     }
+
+                    cubes++;
 
                     var fx = (float)x;
                     var fy = (float)y;
                     var fz = (float)z;
+                    uint indicesCount = 0;
                     
                     // top face
-                    var indicesCount = (uint) vertices.Count / 3;
-                    vertices.AddRange([fx, fy, fz, fx + 1, fy, fz, fx + 1, fy, fz + 1, fx, fy, fz + 1]);
-                    indices.AddRange([indicesCount + 2, indicesCount + 1, indicesCount, indicesCount, indicesCount + 3, indicesCount + 2]);
+                    if (((block >> 1) & 1) == 1)
+                    {
+                        indicesCount = _vi / 3;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz + 1;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 1;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount + 3;
+                        _indices[_ii++] = indicesCount + 2;
+                    }
                     
                     // bottom face
-                    indicesCount = (uint) vertices.Count / 3;
-                    vertices.AddRange([fx, fy - 1, fz, fx + 1, fy - 1, fz, fx + 1, fy - 1, fz + 1, fx, fy - 1, fz + 1]);
-                    indices.AddRange([indicesCount, indicesCount + 1, indicesCount + 2, indicesCount + 2, indicesCount + 3, indicesCount]);
-                    
+                    if (((block >> 2) & 1) == 1)
+                    {
+                        indicesCount = _vi / 3;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz + 1;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount + 1;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 3;
+                        _indices[_ii++] = indicesCount;
+                    }
                     // front face
-                    indicesCount = (uint) vertices.Count / 3;
-                    vertices.AddRange([fx, fy, fz, fx + 1, fy, fz, fx + 1, fy - 1, fz, fx, fy - 1, fz]);
-                    indices.AddRange([indicesCount, indicesCount + 1, indicesCount + 2, indicesCount + 2, indicesCount + 3, indicesCount]);
-                    
+                    if (((block >> 4) & 1) == 1)
+                    {
+                        indicesCount = _vi / 3;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount + 1;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 3;
+                        _indices[_ii++] = indicesCount;
+                    }
                     // back face
-                    indicesCount = (uint) vertices.Count / 3;
-                    vertices.AddRange([fx, fy, fz + 1, fx + 1, fy, fz + 1, fx + 1, fy - 1, fz + 1, fx, fy - 1, fz + 1]);
-                    indices.AddRange([indicesCount, indicesCount + 1, indicesCount + 2, indicesCount + 2, indicesCount + 3, indicesCount]);
+                    if (((block >> 3) & 1) == 1)
+                    {
+                        indicesCount = _vi / 3;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz + 1;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 1;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount + 3;
+                        _indices[_ii++] = indicesCount + 2;
+                    }
                     
                     // left face
-                    indicesCount = (uint) vertices.Count / 3;
-                    vertices.AddRange([fx, fy, fz, fx, fy, fz + 1, fx, fy - 1, fz + 1, fx, fy - 1, fz]);
-                    indices.AddRange([indicesCount + 2, indicesCount + 1, indicesCount, indicesCount, indicesCount + 3, indicesCount + 2]);
-
+                    if (((block >> 5) & 1) == 1)
+                    {
+                        indicesCount = _vi / 3;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 1;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount + 3;
+                        _indices[_ii++] = indicesCount + 2;
+                    }
+                    
                     // right face
-                    indicesCount = (uint) vertices.Count / 3;
-                    vertices.AddRange([fx + 1, fy, fz, fx + 1, fy, fz + 1, fx + 1, fy - 1, fz + 1, fx + 1, fy - 1, fz]);
-                    indices.AddRange([indicesCount, indicesCount + 1, indicesCount + 2, indicesCount + 2, indicesCount + 3, indicesCount]);
+                    if (((block >> 6) & 1) == 1)
+                    {
+                        indicesCount = _vi / 3;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz + 1;
+                        _vertices[_vi++] = fx + 1;
+                        _vertices[_vi++] = fy - 1;
+                        _vertices[_vi++] = fz;
+                        _indices[_ii++] = indicesCount;
+                        _indices[_ii++] = indicesCount + 1;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 2;
+                        _indices[_ii++] = indicesCount + 3;
+                        _indices[_ii++] = indicesCount;
+                    }
                 }
             }
         }
-
-        var verticesArray = vertices.ToArray();
-        var indicesArray = indices.ToArray();
-        _indices = indicesArray.Length;
+        Console.WriteLine("Meshed " + cubes + " cubes.");
+        Console.WriteLine("Skipped " + skipped + " cubes.");
         
         GL.BindBuffer(BufferTarget.ArrayBuffer, _vertexBufferObject);
-        GL.BufferData(BufferTarget.ArrayBuffer, verticesArray.Length * sizeof(float), verticesArray, BufferUsageHint.StaticDraw);
+        GL.BufferData(BufferTarget.ArrayBuffer, (int) _vi * sizeof(float), _vertices, BufferUsageHint.StaticDraw);
         GL.BindVertexArray(_vertexArrayObject);
         GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
         GL.EnableVertexAttribArray(0);
         GL.BindBuffer(BufferTarget.ElementArrayBuffer, _elementBufferObject);
-        GL.BufferData(BufferTarget.ElementArrayBuffer, indicesArray.Length * sizeof(uint), indicesArray, BufferUsageHint.StaticDraw);
+        GL.BufferData(BufferTarget.ElementArrayBuffer, (int) _ii * sizeof(uint), _indices, BufferUsageHint.StaticDraw);
     }
     
     public void Render()
     {
+        GL.Enable(EnableCap.DepthTest);
         GL.Enable(EnableCap.CullFace);
         GL.CullFace(CullFaceMode.Back);
         GL.FrontFace(FrontFaceDirection.Ccw);
         GL.BindVertexArray(_vertexArrayObject);
-        GL.DrawElements(PrimitiveType.Triangles, _indices, DrawElementsType.UnsignedInt, 0);
+        GL.DrawElements(PrimitiveType.Triangles, (int) _ii, DrawElementsType.UnsignedInt, 0);
     }
 
     public void Dispose()

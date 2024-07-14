@@ -86,11 +86,11 @@ public class Game() : GameWindow(GameWindowSettings.Default, new NativeWindowSet
         
             if (KeyboardState.IsKeyDown(Keys.Space))
             {
-                _camera.Move(_camera.Up * dt * speed);
+                _camera.Move(Vector3.UnitY * dt * speed);
             }
             else if (KeyboardState.IsKeyDown(Keys.LeftControl))
             {
-                _camera.Move(-_camera.Up * dt * speed);
+                _camera.Move(-Vector3.UnitY * dt * speed);
             }
 
             if (KeyboardState.IsKeyDown(Keys.W))
